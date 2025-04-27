@@ -1,10 +1,37 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
 <head>
   <meta charset="UTF-8">
-  <title>Radio Verhalen</title>
+  <title>Radio Verhalen Player</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: 'Arial', sans-serif;
+      background-color: #f5f5f5;
+      text-align: center;
+      padding: 40px;
+    }
+    h1 {
+      font-size: 2em;
+      color: #333;
+      margin-bottom: 20px;
+    }
+    audio {
+      width: 100%;
+      max-width: 600px;
+      margin-top: 30px;
+    }
+  </style>
 </head>
 <body>
-  <h1>Welcome to Radio Verhalen!</h1>
+
+  <h1>🎙️ Luister naar Radio Verhalen</h1>
+
+  <audio id="audioPlayer" controls>
+    Jouw browser ondersteunt geen audio-afspelen.
+  </audio>
+
+  <script type="module" src="script.js"></script>
+
 </body>
 </html>
