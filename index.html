@@ -6,7 +6,10 @@
 </head>
 <body>
   <h2>Zgomot Playback</h2>
-  <p>Luister naar de 10 nieuwste verhalen. Elk verhaal wordt maximaal 10 minuten afgespeeld.</p>
+  <p>Luister naar de 10 nieuwste verhalen. Klik op de knop om af te spelen. Elk verhaal wordt maximaal 10 minuten afgespeeld.</p>
+
+  <!-- Play button -->
+  <button id="startPlayback">▶️ Speel af</button>
 
   <!-- Supabase JS client -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
@@ -14,7 +17,7 @@
   <script>
     const SUPABASE_URL = 'https://grumsinwfuekqndldunj.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdydW1zaW53ZnVla3FuZGxkdW5qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU1NzU1MTAsImV4cCI6MjA2MTE1MTUxMH0.fRi83KSLnP-pOgBpQOqGy4IR0392VPawdSQcTIR3zkM';
-    const BUCKET = 'tracks';
+    const BUCKET = 'audio-uploads';
     const MAX_DURATION = 10 * 60 * 1000; // 10 minutes
     const MAX_TRACKS = 10;
 
@@ -23,5 +26,71 @@
     let current = 0;
     let trackList = [];
 
+    document.getElementById('startPlayback').addEventListener('click', async () => {
+      document.getElementById('startPlayback').style.display = 'none'; // hide button
+      await loadTracks();
+    });
+
     async function loadTracks() {
-      const { da
+      const { data, error } = await supabase
+        .storage
+        .from(BUCKET)
+        .list('', { limit: 100 });
+
+      if (error || !data) {
+        console.error('Kon tracks niet laden:', error);
+        document.body.innerHTML += "<p>Fout bij laden van audiobestanden.</p>";
+        return;
+      }
+
+      // Sort newest to oldest and limit to 10 .mp3 files
+      data.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+      trackList = data
+        .filter(file => file.name.endsWith('.mp3'))
+        .slice(0, MAX_TRACKS)
+        .map(file => `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${file.name}`);
+
+      if (trackList.length === 0) {
+        document.body.innerHTML += "<p>Geen audiobestanden gevonden.</p>";
+        return;
+      }
+
+      playNext();
+    }
+
+    function playNext() {
+      if (current >= trackList.length) {
+        location.reload(); // start over
+        return;
+      }
+
+      const url = trackList[current];
+      console.log("Playing:", url);
+      audio.src = url;
+      audio.load();
+
+      let finished = false;
+
+      audio.play().catch(err => {
+        console.error("Playback error:", err);
+        current++;
+        playNext();
+      });
+
+      audio.onended = () => {
+        finished = true;
+        current++;
+        playNext();
+      };
+
+      setTimeout(() => {
+        if (!finished) {
+          audio.pause();
+          current++;
+          playNext();
+        }
+      }, MAX_DURATION);
+    }
+  </script>
+</body>
+</html>
