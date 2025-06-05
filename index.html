@@ -21,7 +21,7 @@
     const MAX_DURATION = 10 * 60 * 1000; // 10 minutes
     const MAX_TRACKS = 10;
 
-    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     const audio = new Audio();
     let current = 0;
     let trackList = [];
@@ -32,7 +32,7 @@
     });
 
     async function loadTracks() {
-      const { data, error } = await supabase
+      const { data, error } = await client
         .storage
         .from(BUCKET)
         .list('', { limit: 100 });
