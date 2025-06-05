@@ -2,18 +2,23 @@
 <html lang="nl">
 <head>
   <meta charset="UTF-8">
-  <title>Zgomot Playback</title>
+  <title>Zgomot Playback (Debug)</title>
   <style>
     button {
       margin: 5px;
       padding: 10px 15px;
       font-size: 16px;
     }
+    #nowPlaying {
+      margin-top: 10px;
+      font-weight: bold;
+      font-family: sans-serif;
+    }
   </style>
 </head>
 <body>
-  <h2>Zgomot Playback</h2>
-  <p>Luister naar de 10 nieuwste verhalen (.mp3 of .webm). Elk verhaal wordt maximaal 10 minuten afgespeeld. Nieuwe uploads worden automatisch opgepikt.</p>
+  <h2>Zgomot Playback (Debug Mode)</h2>
+  <p>Luister naar de 10 nieuwste verhalen (.mp3 of .webm). Elk verhaal wordt maximaal 10 minuten afgespeeld.</p>
 
   <!-- Player Controls -->
   <div id="controls" style="display:none;">
@@ -22,6 +27,7 @@
     <button id="pause">⏸️ Pauzeer</button>
     <button id="stop">⏹️ Stop</button>
     <button id="next">⏭️ Volgende</button>
+    <div id="nowPlaying"></div>
   </div>
 
   <!-- Start Button -->
@@ -88,17 +94,29 @@
         return;
       }
 
+      console.log("Alle bestanden in bucket:", data.map(f => f.name));
+
       data.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
       trackList = data
-        .filter(file => file.name.endsWith('.mp3') || file.name.endsWith('.webm'))
+        .filter(file =>
+          file.name.toLowerCase().endsWith('.mp3') ||
+          file.name.toLowerCase().endsWith('.webm')
+        )
         .slice(0, MAX_TRACKS)
-        .map(file => `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${encodeURIComponent(file.name)}`);
+        .map(file => ({
+          name: file.name,
+          url: `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${encodeURIComponent(file.name)}`
+        }));
 
-      current = 0; // Reset index on reload
+      console.log("Gefilterde audiotracks:", trackList.map(t => t.name));
+
+      current = 0;
+
       if (trackList.length > 0) {
+        document.getElementById('nowPlaying').innerText = `Aantal geladen tracks: ${trackList.length}`;
         playTrack(current);
       } else {
-        document.body.innerHTML += "<p>Geen ondersteunde audiobestanden gevonden (.mp3 of .webm).</p>";
+        document.getElementById('nowPlaying').innerText = "Geen ondersteunde bestanden gevonden.";
       }
     }
 
@@ -106,11 +124,13 @@
       if (timeoutId) clearTimeout(timeoutId);
       if (!trackList[index]) return;
 
-      const url = trackList[index];
-      console.log("Playing:", url);
-      audio.src = url;
+      const track = trackList[index];
+      audio.src = track.url;
       audio.load();
       audio.play().catch(console.error);
+
+      document.getElementById('nowPlaying').innerText = `Now Playing: ${track.name}`;
+      console.log("Now Playing:", track.url);
 
       timeoutId = setTimeout(() => {
         current++;
@@ -125,8 +145,8 @@
 
     async function handleTrackEnd() {
       if (current >= trackList.length) {
-        console.log("Alle tracks afgespeeld — herladen om nieuwe bestanden te checken.");
-        await loadTracks(); // refreshes track list and resets to 0
+        console.log("Alle tracks afgespeeld — nieuwe proberen op te halen.");
+        await loadTracks();
       } else {
         playTrack(current);
       }
