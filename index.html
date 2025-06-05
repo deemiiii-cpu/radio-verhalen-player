@@ -27,7 +27,7 @@
     let trackList = [];
 
     document.getElementById('startPlayback').addEventListener('click', async () => {
-      document.getElementById('startPlayback').style.display = 'none'; // hide button
+      document.getElementById('startPlayback').style.display = 'none';
       await loadTracks();
     });
 
@@ -38,17 +38,16 @@
         .list('', { limit: 100 });
 
       if (error || !data) {
-        console.error('Kon tracks niet laden:', error);
+        console.error('Kon audiobestanden niet laden:', error);
         document.body.innerHTML += "<p>Fout bij laden van audiobestanden.</p>";
         return;
       }
 
-      // Sort newest to oldest and limit to 10 .mp3 files
       data.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
       trackList = data
         .filter(file => file.name.endsWith('.mp3'))
         .slice(0, MAX_TRACKS)
-        .map(file => `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${file.name}`);
+        .map(file => `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${encodeURIComponent(file.name)}`);
 
       if (trackList.length === 0) {
         document.body.innerHTML += "<p>Geen audiobestanden gevonden.</p>";
@@ -60,7 +59,7 @@
 
     function playNext() {
       if (current >= trackList.length) {
-        location.reload(); // start over
+        location.reload(); // Start again
         return;
       }
 
