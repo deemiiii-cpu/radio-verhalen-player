@@ -3,13 +3,29 @@
 <head>
   <meta charset="UTF-8">
   <title>Zgomot Playback</title>
+  <style>
+    button {
+      margin: 5px;
+      padding: 10px 15px;
+      font-size: 16px;
+    }
+  </style>
 </head>
 <body>
   <h2>Zgomot Playback</h2>
-  <p>Luister naar de 10 nieuwste verhalen. Klik op de knop om af te spelen. Elk verhaal wordt maximaal 10 minuten afgespeeld.</p>
+  <p>Luister naar de 10 nieuwste verhalen. Elk verhaal wordt maximaal 10 minuten afgespeeld.</p>
 
-  <!-- Play button -->
-  <button id="startPlayback">▶️ Speel af</button>
+  <!-- Player Controls -->
+  <div id="controls" style="display:none;">
+    <button id="prev">⏮️ Vorige</button>
+    <button id="play">▶️ Speel</button>
+    <button id="pause">⏸️ Pauzeer</button>
+    <button id="stop">⏹️ Stop</button>
+    <button id="next">⏭️ Volgende</button>
+  </div>
+
+  <!-- Start Button -->
+  <button id="startPlayback">Laad en Start Speler</button>
 
   <!-- Supabase JS client -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
@@ -18,17 +34,46 @@
     const SUPABASE_URL = 'https://grumsinwfuekqndldunj.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdydW1zaW53ZnVla3FuZGxkdW5qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU1NzU1MTAsImV4cCI6MjA2MTE1MTUxMH0.fRi83KSLnP-pOgBpQOqGy4IR0392VPawdSQcTIR3zkM';
     const BUCKET = 'audio-uploads';
-    const MAX_DURATION = 10 * 60 * 1000; // 10 minutes
+    const MAX_DURATION = 10 * 60 * 1000;
     const MAX_TRACKS = 10;
 
     const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     const audio = new Audio();
     let current = 0;
     let trackList = [];
+    let timeoutId = null;
 
     document.getElementById('startPlayback').addEventListener('click', async () => {
       document.getElementById('startPlayback').style.display = 'none';
+      document.getElementById('controls').style.display = 'block';
       await loadTracks();
+    });
+
+    document.getElementById('play').addEventListener('click', () => {
+      if (audio.src) {
+        audio.play();
+      } else {
+        playTrack(current);
+      }
+    });
+
+    document.getElementById('pause').addEventListener('click', () => {
+      audio.pause();
+    });
+
+    document.getElementById('stop').addEventListener('click', () => {
+      audio.pause();
+      audio.currentTime = 0;
+    });
+
+    document.getElementById('next').addEventListener('click', () => {
+      current = (current + 1) % trackList.length;
+      playTrack(current);
+    });
+
+    document.getElementById('prev').addEventListener('click', () => {
+      current = (current - 1 + trackList.length) % trackList.length;
+      playTrack(current);
     });
 
     async function loadTracks() {
@@ -54,41 +99,33 @@
         return;
       }
 
-      playNext();
+      playTrack(current);
     }
 
-    function playNext() {
-      if (current >= trackList.length) {
-        location.reload(); // Start again
-        return;
+    function playTrack(index) {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
       }
 
-      const url = trackList[current];
+      if (!trackList[index]) return;
+
+      const url = trackList[index];
       console.log("Playing:", url);
       audio.src = url;
       audio.load();
+      audio.play().catch(console.error);
 
-      let finished = false;
-
-      audio.play().catch(err => {
-        console.error("Playback error:", err);
-        current++;
-        playNext();
-      });
+      // Stop playback after max duration
+      timeoutId = setTimeout(() => {
+        audio.pause();
+        current = (current + 1) % trackList.length;
+        playTrack(current);
+      }, MAX_DURATION);
 
       audio.onended = () => {
-        finished = true;
-        current++;
-        playNext();
+        current = (current + 1) % trackList.length;
+        playTrack(current);
       };
-
-      setTimeout(() => {
-        if (!finished) {
-          audio.pause();
-          current++;
-          playNext();
-        }
-      }, MAX_DURATION);
     }
   </script>
 </body>
