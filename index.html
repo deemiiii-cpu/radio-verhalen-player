@@ -13,7 +13,7 @@
 </head>
 <body>
   <h2>Zgomot Playback</h2>
-  <p>Luister naar de 10 nieuwste verhalen. Elk verhaal wordt maximaal 10 minuten afgespeeld.</p>
+  <p>Luister naar de 10 nieuwste verhalen. Elk verhaal wordt maximaal 10 minuten afgespeeld. Nieuwe uploads worden automatisch opgepikt.</p>
 
   <!-- Player Controls -->
   <div id="controls" style="display:none;">
@@ -94,18 +94,16 @@
         .slice(0, MAX_TRACKS)
         .map(file => `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${encodeURIComponent(file.name)}`);
 
-      if (trackList.length === 0) {
+      current = 0; // Reset index on reload
+      if (trackList.length > 0) {
+        playTrack(current);
+      } else {
         document.body.innerHTML += "<p>Geen audiobestanden gevonden.</p>";
-        return;
       }
-
-      playTrack(current);
     }
 
     function playTrack(index) {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
+      if (timeoutId) clearTimeout(timeoutId);
 
       if (!trackList[index]) return;
 
@@ -115,17 +113,24 @@
       audio.load();
       audio.play().catch(console.error);
 
-      // Stop playback after max duration
       timeoutId = setTimeout(() => {
-        audio.pause();
-        current = (current + 1) % trackList.length;
-        playTrack(current);
+        current++;
+        handleTrackEnd();
       }, MAX_DURATION);
 
       audio.onended = () => {
-        current = (current + 1) % trackList.length;
-        playTrack(current);
+        current++;
+        handleTrackEnd();
       };
+    }
+
+    async function handleTrackEnd() {
+      if (current >= trackList.length) {
+        console.log("All tracks played — checking for updates...");
+        await loadTracks(); // refreshes track list and resets to 0
+      } else {
+        playTrack(current);
+      }
     }
   </script>
 </body>
