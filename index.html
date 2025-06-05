@@ -2,36 +2,75 @@
 <html lang="nl">
 <head>
   <meta charset="UTF-8">
-  <title>Radio Verhalen Player</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>
-    body {
-      font-family: 'Arial', sans-serif;
-      background-color: #f5f5f5;
-      text-align: center;
-      padding: 40px;
-    }
-    h1 {
-      font-size: 2em;
-      color: #333;
-      margin-bottom: 20px;
-    }
-    audio {
-      width: 100%;
-      max-width: 600px;
-      margin-top: 30px;
-    }
-  </style>
+  <title>Zgomot Playback</title>
 </head>
 <body>
+  <h2>Zgomot Playback</h2>
+  <p>Luistert naar de 10 nieuwste verhalen. Elk verhaal wordt maximaal 10 minuten afgespeeld.</p>
 
-  <h1>🎙️ Luister naar Radio Verhalen</h1>
+  <!-- Supabase library -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 
-  <audio id="audioPlayer" controls>
-    Jouw browser ondersteunt geen audio-afspelen.
-  </audio>
+  <script>
+    const SUPABASE_URL = 'https://YOUR-PROJECT.supabase.co'; // ← replace
+    const SUPABASE_ANON_KEY = 'YOUR-ANON-KEY'; // ← replace
+    const BUCKET = 'tracks';
+    const MAX_DURATION = 10 * 60 * 1000; // 10 minutes in ms
 
-  <script type="module" src="script.js"></script>
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const audio = new Audio();
+    let current = 0;
+    let trackList = [];
 
+    async function loadTracks() {
+      const { data, error } = await supabase.storage
+        .from(BUCKET)
+        .list('', { limit: 100 }); // fetch more and sort manually
+
+      if (error || !data) {
+        console.error('Failed to load files:', error);
+        return;
+      }
+
+      // Sort by last_modified descending, then limit to 10 newest
+      data.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+      trackList = data.slice(0, 10).map(file =>
+        `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${file.name}`
+      );
+
+      playNext();
+    }
+
+    function playNext() {
+      if (current >= trackList.length) {
+        location.reload(); // restart playback cycle
+        return;
+      }
+
+      const url = trackList[current];
+      audio.src = url;
+      audio.load();
+
+      let finished = false;
+
+      audio.play().catch(console.error);
+
+      audio.onended = () => {
+        finished = true;
+        current++;
+        playNext();
+      };
+
+      setTimeout(() => {
+        if (!finished) {
+          audio.pause();
+          current++;
+          playNext();
+        }
+      }, MAX_DURATION);
+    }
+
+    loadTracks();
+  </script>
 </body>
 </html>
