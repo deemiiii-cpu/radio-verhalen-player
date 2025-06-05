@@ -13,7 +13,7 @@
 </head>
 <body>
   <h2>Zgomot Playback</h2>
-  <p>Luister naar de 10 nieuwste verhalen. Elk verhaal wordt maximaal 10 minuten afgespeeld. Nieuwe uploads worden automatisch opgepikt.</p>
+  <p>Luister naar de 10 nieuwste verhalen (.mp3 of .webm). Elk verhaal wordt maximaal 10 minuten afgespeeld. Nieuwe uploads worden automatisch opgepikt.</p>
 
   <!-- Player Controls -->
   <div id="controls" style="display:none;">
@@ -90,7 +90,7 @@
 
       data.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
       trackList = data
-        .filter(file => file.name.endsWith('.mp3'))
+        .filter(file => file.name.endsWith('.mp3') || file.name.endsWith('.webm'))
         .slice(0, MAX_TRACKS)
         .map(file => `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${encodeURIComponent(file.name)}`);
 
@@ -98,13 +98,12 @@
       if (trackList.length > 0) {
         playTrack(current);
       } else {
-        document.body.innerHTML += "<p>Geen audiobestanden gevonden.</p>";
+        document.body.innerHTML += "<p>Geen ondersteunde audiobestanden gevonden (.mp3 of .webm).</p>";
       }
     }
 
     function playTrack(index) {
       if (timeoutId) clearTimeout(timeoutId);
-
       if (!trackList[index]) return;
 
       const url = trackList[index];
@@ -126,7 +125,7 @@
 
     async function handleTrackEnd() {
       if (current >= trackList.length) {
-        console.log("All tracks played — checking for updates...");
+        console.log("Alle tracks afgespeeld — herladen om nieuwe bestanden te checken.");
         await loadTracks(); // refreshes track list and resets to 0
       } else {
         playTrack(current);
