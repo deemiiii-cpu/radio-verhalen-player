@@ -6,16 +6,17 @@
 </head>
 <body>
   <h2>Zgomot Playback</h2>
-  <p>Luistert naar de 10 nieuwste verhalen. Elk verhaal wordt maximaal 10 minuten afgespeeld.</p>
+  <p>Luister naar de 10 nieuwste verhalen. Elk verhaal wordt maximaal 10 minuten afgespeeld.</p>
 
-  <!-- Supabase library -->
+  <!-- Supabase JS client -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 
   <script>
-    const SUPABASE_URL = 'https://grumsinwfuekqndldunj.supabase.co'; // ← replace
-    const SUPABASE_ANON_KEY = 'process.env.SUPABASE_KEY'; // ← replace
+    const SUPABASE_URL = 'https://grumsinwfuekqndldunj.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdydW1zaW53ZnVla3FuZGxkdW5qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU1NzU1MTAsImV4cCI6MjA2MTE1MTUxMH0.fRi83KSLnP-pOgBpQOqGy4IR0392VPawdSQcTIR3zkM';
     const BUCKET = 'tracks';
-    const MAX_DURATION = 10 * 60 * 1000; // 10 minutes in ms
+    const MAX_DURATION = 10 * 60 * 1000; // 10 minutes
+    const MAX_TRACKS = 10;
 
     const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     const audio = new Audio();
@@ -23,54 +24,4 @@
     let trackList = [];
 
     async function loadTracks() {
-      const { data, error } = await supabase.storage
-        .from(BUCKET)
-        .list('', { limit: 100 }); // fetch more and sort manually
-
-      if (error || !data) {
-        console.error('Failed to load files:', error);
-        return;
-      }
-
-      // Sort by last_modified descending, then limit to 10 newest
-      data.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
-      trackList = data.slice(0, 10).map(file =>
-        `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${file.name}`
-      );
-
-      playNext();
-    }
-
-    function playNext() {
-      if (current >= trackList.length) {
-        location.reload(); // restart playback cycle
-        return;
-      }
-
-      const url = trackList[current];
-      audio.src = url;
-      audio.load();
-
-      let finished = false;
-
-      audio.play().catch(console.error);
-
-      audio.onended = () => {
-        finished = true;
-        current++;
-        playNext();
-      };
-
-      setTimeout(() => {
-        if (!finished) {
-          audio.pause();
-          current++;
-          playNext();
-        }
-      }, MAX_DURATION);
-    }
-
-    loadTracks();
-  </script>
-</body>
-</html>
+      const { da
