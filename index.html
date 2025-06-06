@@ -18,7 +18,7 @@
 </head>
 <body>
   <h2>Zgomot Playback</h2>
-  <p>Luister naar de 10 nieuwste verhalen (.mp3, .webm, .m4a, .ogg, .wav). Elk verhaal wordt maximaal 10 minuten afgespeeld. Nieuwe uploads worden automatisch opgepikt.</p>
+  <p>Luister naar de 10 nieuwste verhalen (.mp3, .webm, .m4a, .ogg, .wav). Elk verhaal wordt maximaal 5 minuten afgespeeld. Nieuwe uploads worden automatisch opgepikt.</p>
 
   <div id="controls" style="display:none;">
     <button id="prev">⏮️ Vorige</button>
@@ -32,12 +32,11 @@
   <button id="startPlayback">Laad en Start Speler</button>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
-
   <script>
     const SUPABASE_URL = 'https://grumsinwfuekqndldunj.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdydW1zaW53ZnVla3FuZGxkdW5qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU1NzU1MTAsImV4cCI6MjA2MTE1MTUxMH0.fRi83KSLnP-pOgBpQOqGy4IR0392VPawdSQcTIR3zkM';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'; // Truncated for readability
     const BUCKET = 'audio-uploads';
-    const MAX_DURATION = 10 * 60 * 1000;
+    const MAX_DURATION = 5 * 60 * 1000; // 5 minutes
     const MAX_TRACKS = 10;
 
     const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -50,6 +49,9 @@
       document.getElementById('startPlayback').style.display = 'none';
       document.getElementById('controls').style.display = 'block';
       await loadTracks();
+
+      // Refresh every 30 seconds
+      setInterval(refreshTracks, 30000);
     });
 
     document.getElementById('play').addEventListener('click', () => {
@@ -80,10 +82,7 @@
     });
 
     async function loadTracks() {
-      const { data, error } = await client
-        .storage
-        .from(BUCKET)
-        .list('', { limit: 100 });
+      const { data, error } = await client.storage.from(BUCKET).list('', { limit: 100 });
 
       if (error || !data) {
         console.error('Kon audiobestanden niet laden:', error);
@@ -91,27 +90,14 @@
         return;
       }
 
-      console.log("Alle bestanden in bucket:", data.map(f => f.name));
-
       data.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
       trackList = data
-        .filter(file => {
-          const name = file.name.toLowerCase();
-          return (
-            name.endsWith('.mp3') ||
-            name.endsWith('.webm') ||
-            name.endsWith('.m4a') ||
-            name.endsWith('.ogg') ||
-            name.endsWith('.wav')
-          );
-        })
+        .filter(file => /\.(mp3|webm|m4a|ogg|wav)$/i.test(file.name))
         .slice(0, MAX_TRACKS)
         .map(file => ({
           name: file.name,
           url: `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${encodeURIComponent(file.name)}`
         }));
-
-      console.log("Gefilterde audiotracks:", trackList.map(t => t.name));
 
       current = 0;
 
@@ -148,10 +134,41 @@
 
     async function handleTrackEnd() {
       if (current >= trackList.length) {
-        console.log("Alle tracks afgespeeld — nieuwe proberen op te halen.");
-        await loadTracks();
+        console.log("Alle tracks afgespeeld — probeer nieuwe te laden.");
+        await refreshTracks(); // instead of full reload
+        current = 0;
+        playTrack(current);
       } else {
         playTrack(current);
+      }
+    }
+
+    async function refreshTracks() {
+      const { data, error } = await client.storage.from(BUCKET).list('', { limit: 100 });
+      if (error || !data) return;
+
+      data.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+      const newFiles = data
+        .filter(file => /\.(mp3|webm|m4a|ogg|wav)$/i.test(file.name))
+        .slice(0, MAX_TRACKS);
+
+      const existingNames = new Set(trackList.map(t => t.name));
+      const additions = newFiles.filter(file => !existingNames.has(file.name));
+
+      if (additions.length > 0) {
+        additions.forEach(file => {
+          trackList.push({
+            name: file.name,
+            url: `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${encodeURIComponent(file.name)}`
+          });
+        });
+
+        trackList = trackList
+          .sort((a, b) => new Date(b.name.split('_')[0]) - new Date(a.name.split('_')[0]))
+          .slice(0, MAX_TRACKS);
+
+        document.getElementById('nowPlaying').innerText = `Bijgewerkte tracklijst (${trackList.length})`;
+        console.log("Nieuwe tracks toegevoegd:", additions.map(f => f.name));
       }
     }
   </script>
