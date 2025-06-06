@@ -32,15 +32,16 @@
   <button id="startPlayback">Laad en Start Speler</button>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+
   <script>
     const SUPABASE_URL = 'https://grumsinwfuekqndldunj.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdydW1zaW53ZnVla3FuZGxkdW5qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU1NzU1MTAsImV4cCI6MjA2MTE1MTUxMH0.fRi83KSLnP-pOgBpQOqGy4IR0392VPawdSQcTIR3zkM';
     const BUCKET = 'audio-uploads';
     const MAX_DURATION = 5 * 60 * 1000; // 5 minutes
     const MAX_TRACKS = 10;
-    const POLL_INTERVAL = 30000; // 30 seconds
+    const POLL_INTERVAL = 30000; // every 30 seconds
 
-    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     const audio = new Audio();
     let current = 0;
     let trackList = [];
@@ -48,6 +49,7 @@
     let polling = false;
 
     document.getElementById('startPlayback').addEventListener('click', async () => {
+      console.log("Start button clicked");
       document.getElementById('startPlayback').style.display = 'none';
       document.getElementById('controls').style.display = 'block';
       await loadTracks();
@@ -79,7 +81,7 @@
     });
 
     async function loadTracks() {
-      const { data, error } = await supabase.storage.from(BUCKET).list('', { limit: 100 });
+      const { data, error } = await client.storage.from(BUCKET).list('', { limit: 100 });
       if (error || !data) {
         console.error('Kon audiobestanden niet laden:', error);
         document.getElementById('nowPlaying').innerText = 'Fout bij laden van audiobestanden.';
@@ -88,8 +90,8 @@
 
       const filtered = data
         .filter(f => /\.(mp3|webm|m4a|ogg|wav)$/i.test(f.name))
-        .sort((a, b) => new Date(b.metadata?.created_at || 0) - new Date(a.metadata?.created_at || 0))
-        .slice(-MAX_TRACKS);
+        .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
+        .slice(0, MAX_TRACKS);
 
       const newTrackList = filtered.map(f => ({
         name: f.name,
