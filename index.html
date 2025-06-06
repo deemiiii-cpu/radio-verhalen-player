@@ -2,7 +2,7 @@
 <html lang="nl">
 <head>
   <meta charset="UTF-8">
-  <title>Zgomot Playback (All Formats)</title>
+  <title>Zgomot Playback (Live Update)</title>
   <style>
     button {
       margin: 5px;
@@ -32,26 +32,27 @@
   <button id="startPlayback">Laad en Start Speler</button>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+
   <script>
     const SUPABASE_URL = 'https://grumsinwfuekqndldunj.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'; // Truncated for readability
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'; // Your full anon key
     const BUCKET = 'audio-uploads';
     const MAX_DURATION = 5 * 60 * 1000; // 5 minutes
     const MAX_TRACKS = 10;
+    const POLL_INTERVAL = 30000; // 30 seconds
 
-    const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     const audio = new Audio();
     let current = 0;
     let trackList = [];
     let timeoutId = null;
+    let polling = false;
 
     document.getElementById('startPlayback').addEventListener('click', async () => {
       document.getElementById('startPlayback').style.display = 'none';
       document.getElementById('controls').style.display = 'block';
       await loadTracks();
-
-      // Refresh every 30 seconds
-      setInterval(refreshTracks, 30000);
+      startPolling();
     });
 
     document.getElementById('play').addEventListener('click', () => {
@@ -62,10 +63,7 @@
       }
     });
 
-    document.getElementById('pause').addEventListener('click', () => {
-      audio.pause();
-    });
-
+    document.getElementById('pause').addEventListener('click', () => audio.pause());
     document.getElementById('stop').addEventListener('click', () => {
       audio.pause();
       audio.currentTime = 0;
@@ -82,30 +80,31 @@
     });
 
     async function loadTracks() {
-      const { data, error } = await client.storage.from(BUCKET).list('', { limit: 100 });
-
+      const { data, error } = await supabase.storage.from(BUCKET).list('', { limit: 100 });
       if (error || !data) {
         console.error('Kon audiobestanden niet laden:', error);
-        document.body.innerHTML += "<p>Fout bij laden van audiobestanden.</p>";
+        document.getElementById('nowPlaying').innerText = 'Fout bij laden van audiobestanden.';
         return;
       }
 
-      data.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
-      trackList = data
-        .filter(file => /\.(mp3|webm|m4a|ogg|wav)$/i.test(file.name))
-        .slice(0, MAX_TRACKS)
-        .map(file => ({
-          name: file.name,
-          url: `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${encodeURIComponent(file.name)}`
-        }));
+      const filtered = data
+        .filter(f => /\.(mp3|webm|m4a|ogg|wav)$/i.test(f.name))
+        .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
+        .slice(0, MAX_TRACKS);
 
-      current = 0;
+      const newTrackList = filtered.map(f => ({
+        name: f.name,
+        url: `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${encodeURIComponent(f.name)}`
+      }));
 
-      if (trackList.length > 0) {
-        document.getElementById('nowPlaying').innerText = `Aantal geladen tracks: ${trackList.length}`;
+      const names = trackList.map(t => t.name);
+      const newNames = newTrackList.map(t => t.name);
+
+      if (JSON.stringify(names) !== JSON.stringify(newNames)) {
+        console.log("Nieuwe bestanden gedetecteerd");
+        trackList = newTrackList;
+        current = 0;
         playTrack(current);
-      } else {
-        document.getElementById('nowPlaying').innerText = "Geen ondersteunde bestanden gevonden.";
       }
     }
 
@@ -117,9 +116,7 @@
       audio.src = track.url;
       audio.load();
       audio.play().catch(console.error);
-
       document.getElementById('nowPlaying').innerText = `Now Playing: ${track.name}`;
-      console.log("Now Playing:", track.url);
 
       timeoutId = setTimeout(() => {
         current++;
@@ -134,42 +131,16 @@
 
     async function handleTrackEnd() {
       if (current >= trackList.length) {
-        console.log("Alle tracks afgespeeld — probeer nieuwe te laden.");
-        await refreshTracks(); // instead of full reload
-        current = 0;
-        playTrack(current);
+        await loadTracks();
       } else {
         playTrack(current);
       }
     }
 
-    async function refreshTracks() {
-      const { data, error } = await client.storage.from(BUCKET).list('', { limit: 100 });
-      if (error || !data) return;
-
-      data.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
-      const newFiles = data
-        .filter(file => /\.(mp3|webm|m4a|ogg|wav)$/i.test(file.name))
-        .slice(0, MAX_TRACKS);
-
-      const existingNames = new Set(trackList.map(t => t.name));
-      const additions = newFiles.filter(file => !existingNames.has(file.name));
-
-      if (additions.length > 0) {
-        additions.forEach(file => {
-          trackList.push({
-            name: file.name,
-            url: `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${encodeURIComponent(file.name)}`
-          });
-        });
-
-        trackList = trackList
-          .sort((a, b) => new Date(b.name.split('_')[0]) - new Date(a.name.split('_')[0]))
-          .slice(0, MAX_TRACKS);
-
-        document.getElementById('nowPlaying').innerText = `Bijgewerkte tracklijst (${trackList.length})`;
-        console.log("Nieuwe tracks toegevoegd:", additions.map(f => f.name));
-      }
+    function startPolling() {
+      if (polling) return;
+      polling = true;
+      setInterval(() => loadTracks(), POLL_INTERVAL);
     }
   </script>
 </body>
